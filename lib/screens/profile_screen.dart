@@ -28,9 +28,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
   final _birthdayController = TextEditingController();
   final _positionController = TextEditingController();
 
+  // PASSWORD: new controllers
+  final _currentPasswordController = TextEditingController();
+  final _newPasswordController = TextEditingController();
+  final _confirmPasswordController = TextEditingController();
+
   bool _isLoading = true;
   bool _isSaving = false;
   bool _isEditing = false;
+
+  // PASSWORD: controls showing password section / button loading
+  bool _isChangingPassword = false;
+  bool _isUpdatingPassword = false;
 
   String? _photoUrl;
   File? _newPhotoFile;
@@ -51,6 +60,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
     _phoneController.dispose();
     _birthdayController.dispose();
     _positionController.dispose();
+
+    // PASSWORD: dispose controllers
+    _currentPasswordController.dispose();
+    _newPasswordController.dispose();
+    _confirmPasswordController.dispose();
+
     super.dispose();
   }
 
@@ -134,6 +149,75 @@ class _ProfileScreenState extends State<ProfileScreen> {
     });
   }
 
+  // PASSWORD: change password logic
+  Future<void> _handleChangePassword() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    final current = _currentPasswordController.text.trim();
+    final newPass = _newPasswordController.text.trim();
+    final confirm = _confirmPasswordController.text.trim();
+
+    if (current.isEmpty || newPass.isEmpty || confirm.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please fill in all password fields')),
+      );
+      return;
+    }
+
+    if (newPass.length < 6) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('New password must be at least 6 characters')),
+      );
+      return;
+    }
+
+    if (newPass != confirm) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('New passwords do not match')),
+      );
+      return;
+    }
+
+    setState(() => _isUpdatingPassword = true);
+
+    try {
+      final emailForReauth = user.email ?? _emailController.text.trim();
+
+      final cred = EmailAuthProvider.credential(
+        email: emailForReauth,
+        password: current,
+      );
+
+      // re-authenticate
+      await user.reauthenticateWithCredential(cred);
+
+      // update password
+      await user.updatePassword(newPass);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Password updated successfully')),
+      );
+
+      setState(() {
+        _isChangingPassword = false;
+        _currentPasswordController.clear();
+        _newPasswordController.clear();
+        _confirmPasswordController.clear();
+      });
+    } on FirebaseAuthException catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.message ?? 'Failed to update password')),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to update password: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _isUpdatingPassword = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     const accent = Color(0xFF660094);
@@ -189,7 +273,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           children: [
             const SizedBox(height: 12),
 
-            /// FIXED AVATAR (editable, shows uploaded image)
+            /// Avatar (unchanged)
             GestureDetector(
               onTap: _pickNewPhoto,
               child: Stack(
@@ -209,12 +293,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                     child: UserAvatar(
                       photoUrl: _photoUrl,
-                      fileImage:
-                          _newPhotoFile != null ? FileImage(_newPhotoFile!) : null,
+                      fileImage: _newPhotoFile != null
+                          ? FileImage(_newPhotoFile!)
+                          : null,
                       radius: 48,
                     ),
                   ),
-
                   if (_isEditing)
                     Container(
                       padding: const EdgeInsets.all(6),
@@ -222,8 +306,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         color: accent,
                         shape: BoxShape.circle,
                       ),
-                      child: const Icon(Icons.camera_alt,
-                          color: Colors.white, size: 16),
+                      child: const Icon(
+                        Icons.camera_alt,
+                        color: Colors.white,
+                        size: 16,
+                      ),
                     )
                 ],
               ),
@@ -269,6 +356,91 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ],
               ),
             ),
+
+            const SizedBox(height: 20),
+
+            // CHANGE PASSWORD ENTRY POINT
+            if (!_isChangingPassword)
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton(
+                  onPressed: () {
+                    setState(() => _isChangingPassword = true);
+                  },
+                  child: const Text(
+                    "Change password",
+                    style: TextStyle(
+                      color: accent,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ),
+
+            // PASSWORD FIELDS
+            if (_isChangingPassword) ...[
+              const SizedBox(height: 8),
+              _buildPasswordField(
+                label: "Current password",
+                controller: _currentPasswordController,
+              ),
+              _buildPasswordField(
+                label: "New password",
+                controller: _newPasswordController,
+              ),
+              _buildPasswordField(
+                label: "Confirm new password",
+                controller: _confirmPasswordController,
+              ),
+              const SizedBox(height: 10),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: _isUpdatingPassword ? null : _handleChangePassword,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: accent,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
+                  child: _isUpdatingPassword
+                      ? const SizedBox(
+                          height: 18,
+                          width: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Text(
+                          "Save password",
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                ),
+              ),
+              TextButton(
+                onPressed: _isUpdatingPassword
+                    ? null
+                    : () {
+                        setState(() {
+                          _isChangingPassword = false;
+                          _currentPasswordController.clear();
+                          _newPasswordController.clear();
+                          _confirmPasswordController.clear();
+                        });
+                      },
+                child: const Text(
+                  "Cancel",
+                  style: TextStyle(color: Colors.black54),
+                ),
+              ),
+            ],
+
+            const SizedBox(height: 24),
           ],
         ),
       ),
@@ -294,6 +466,30 @@ class _ProfileScreenState extends State<ProfileScreen> {
           labelText: label,
           filled: true,
           fillColor: enabled ? fieldBg : fieldBg.withOpacity(.7),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(16),
+            borderSide: BorderSide.none,
+          ),
+        ),
+      ),
+    );
+  }
+
+  // password-specific field builder
+  Widget _buildPasswordField({
+    required String label,
+    required TextEditingController controller,
+  }) {
+    const fieldBg = Color(0xFFF5F5F5);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: TextFormField(
+        controller: controller,
+        obscureText: true,
+        decoration: InputDecoration(
+          labelText: label,
+          filled: true,
+          fillColor: fieldBg,
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(16),
             borderSide: BorderSide.none,
