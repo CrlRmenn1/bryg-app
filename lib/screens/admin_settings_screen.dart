@@ -1,12 +1,12 @@
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
-import 'request_screen.dart';
-import 'report_form_screen.dart';
-import 'start_screen.dart';
+import 'package:brgy_app/screens/start_screen.dart';
 
-class SettingsScreen extends StatelessWidget {
-  const SettingsScreen({super.key});
+import 'admin_profile_screen.dart';
+
+class AdminSettingsScreen extends StatelessWidget {
+  const AdminSettingsScreen({super.key});
 
   Future<void> _logout(BuildContext context) async {
     await FirebaseAuth.instance.signOut();
@@ -40,7 +40,7 @@ class SettingsScreen extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
           child: Column(
             children: [
-              // Request Documents
+              // ADMIN PROFILE
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
@@ -57,12 +57,12 @@ class SettingsScreen extends StatelessWidget {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (_) => const RequestScreen(),
+                        builder: (_) => const AdminProfileScreen(),
                       ),
                     );
                   },
                   child: const Text(
-                    'Request Documents',
+                    'Admin Profile',
                     style: TextStyle(
                       fontWeight: FontWeight.w500,
                       fontSize: 15,
@@ -70,41 +70,10 @@ class SettingsScreen extends StatelessWidget {
                   ),
                 ),
               ),
-              const SizedBox(height: 16),
 
-              // File a Report
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    elevation: 0,
-                    backgroundColor: pillBg,
-                    foregroundColor: Colors.black87,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(24),
-                    ),
-                  ),
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const ReportFormScreen(),
-                      ),
-                    );
-                  },
-                  child: const Text(
-                    'File a Report',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w500,
-                      fontSize: 15,
-                    ),
-                  ),
-                ),
-              ),
               const SizedBox(height: 24),
 
-              // Logout
+              // LOGOUT BUTTON
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(

@@ -45,7 +45,7 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
           AdminRequestsScreen(),
           AdminReportsScreen(),
           AdminChatListScreen(),
-          AdminUsersScreen(),
+          AdminUserScreen(),
         ],
       ),
       bottomNavigationBar: AdminNavBar(

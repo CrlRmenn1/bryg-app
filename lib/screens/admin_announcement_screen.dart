@@ -1,58 +1,115 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import 'admin_post_announcement_form.dart'; // <-- Your form screen
+
+import 'admin_post_announcement_form.dart';
 
 class AdminAnnouncementScreen extends StatelessWidget {
   const AdminAnnouncementScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
+    const accent = Color(0xFF660094);
+
+    final stream = FirebaseFirestore.instance
+        .collection('announcements')
+        .orderBy('createdAt', descending: true)
+        .snapshots();
+
     return Scaffold(
       backgroundColor: Colors.white,
-
       appBar: AppBar(
-        elevation: 0,
-        backgroundColor: Colors.white,
-        centerTitle: true,
         title: const Text(
-          "Announcements",
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            color: Colors.black87,
-          ),
+          'Announcements',
+          style: TextStyle(color: Colors.black87),
         ),
+        backgroundColor: Colors.white,
+        foregroundColor: Colors.black87,
+        elevation: 0,
       ),
-
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            children: [
-              AnnouncementCard(
-                title: "Barangay Assembly",
-                date: "Feb 20",
-                content:
-                    "All residents are invited for the general assembly this Friday.",
+      body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+        stream: stream,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+            return const Center(
+              child: Text(
+                'No announcements yet.\nTap + to add one.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.black54),
               ),
-              const SizedBox(height: 16),
+            );
+          }
 
-              AnnouncementCard(
-                title: "Road Maintenance",
-                date: "Feb 17",
-                content:
-                    "Portions of Purok 2 will undergo road work. Expect minor delays.",
-              ),
-              const SizedBox(height: 16),
-            ],
-          ),
-        ),
+          final docs = snapshot.data!.docs;
+
+          return ListView.builder(
+            padding: const EdgeInsets.all(16),
+            itemCount: docs.length,
+            itemBuilder: (context, index) {
+              final doc = docs[index];
+              final data = doc.data();
+
+              final title = (data['title'] ?? 'Announcement').toString();
+              final content = (data['content'] ?? '').toString();
+              final createdAt = data['createdAt'] as Timestamp?;
+              final dt = createdAt?.toDate();
+              final dateLabel =
+                  dt == null ? '' : '${dt.month}/${dt.day}/${dt.year}';
+
+              return Card(
+                margin: const EdgeInsets.only(bottom: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: ListTile(
+                  title: Text(
+                    title,
+                    style: const TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                  subtitle: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (dateLabel.isNotEmpty)
+                        Text(
+                          dateLabel,
+                          style: const TextStyle(
+                              fontSize: 11, color: Colors.black54),
+                        ),
+                      const SizedBox(height: 4),
+                      Text(
+                        content,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                  trailing: IconButton(
+                    icon: const Icon(Icons.delete_outline),
+                    onPressed: () async {
+                      await doc.reference.delete();
+                    },
+                  ),
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => AdminPostAnnouncementForm(
+                          announcementId: doc.id,
+                          initialData: data,
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              );
+            },
+          );
+        },
       ),
-
       floatingActionButton: FloatingActionButton(
-        backgroundColor: const Color(0xFF7B2CBF),
-        elevation: 4,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(50),
-        ),
+        backgroundColor: accent,
         onPressed: () {
           Navigator.push(
             context,
@@ -61,85 +118,7 @@ class AdminAnnouncementScreen extends StatelessWidget {
             ),
           );
         },
-        child: const Icon(
-          Icons.campaign_rounded, // MEGAPHONE ICON
-          size: 30,
-          color: Colors.white,
-        ),
-      ),
-    );
-  }
-}
-
-//
-// ------------------------------------------------------------
-// ANNOUNCEMENT CARD WIDGET
-// ------------------------------------------------------------
-//
-class AnnouncementCard extends StatelessWidget {
-  final String title;
-  final String content;
-  final String date;
-
-  const AnnouncementCard({
-    super.key,
-    required this.title,
-    required this.content,
-    required this.date,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF9F6FF),
-        borderRadius: BorderRadius.circular(18),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 8,
-            offset: const Offset(0, 3),
-          )
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Title
-          Text(
-            title,
-            style: const TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 16,
-              color: Color(0xFF7B2CBF),
-            ),
-          ),
-
-          const SizedBox(height: 10),
-
-          // Content
-          Text(
-            content,
-            style: const TextStyle(
-              fontSize: 15,
-              color: Colors.black87,
-              height: 1.4,
-            ),
-          ),
-
-          const SizedBox(height: 16),
-
-          // Date
-          Text(
-            date,
-            style: TextStyle(
-              fontSize: 12,
-              color: Colors.grey.shade600,
-            ),
-          ),
-        ],
+        child: const Icon(Icons.add, color: Colors.white),
       ),
     );
   }

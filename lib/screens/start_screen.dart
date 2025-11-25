@@ -117,7 +117,7 @@ class StartScreen extends StatelessWidget {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: const [
                       Text(
-                        "I already have an account",
+                        "I don't have an account",
                         style: TextStyle(
                           color: Colors.black54,
                           fontSize: 14,

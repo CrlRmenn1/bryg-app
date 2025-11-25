@@ -1,178 +1,132 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import 'admin_event_form.dart'; // <-- Your form screen
+
+import 'admin_event_form.dart';
 
 class AdminEventScreen extends StatelessWidget {
   const AdminEventScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
+    const accent = Color(0xFF660094);
+
+    final stream = FirebaseFirestore.instance
+        .collection('events')
+        .orderBy('date')
+        .snapshots();
+
     return Scaffold(
       backgroundColor: Colors.white,
-
       appBar: AppBar(
-        elevation: 0,
-        backgroundColor: Colors.white,
-        centerTitle: true,
         title: const Text(
-          "Events",
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            color: Colors.black87,
-          ),
+          'Events',
+          style: TextStyle(color: Colors.black87),
         ),
+        backgroundColor: Colors.white,
+        foregroundColor: Colors.black87,
+        elevation: 0,
       ),
-
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            children: const [
-              EventCard(
-                title: "Community Clean-Up Drive",
-                date: "March 12 • 8:00 AM",
-                location: "Barangay Hall → Riverside",
-                imagePath: "assets/event_placeholder.png",
+      body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+        stream: stream,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+            return const Center(
+              child: Text(
+                'No events yet.\nTap + to add one.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.black54),
               ),
-              SizedBox(height: 16),
+            );
+          }
 
-              EventCard(
-                title: "Health & Wellness Seminar",
-                date: "March 5 • 2:00 PM",
-                location: "Barangay Multi-Purpose Gym",
-                imagePath: "assets/event_placeholder.png",
-              ),
-            ],
-          ),
-        ),
+          final docs = snapshot.data!.docs;
+
+          return ListView.builder(
+            padding: const EdgeInsets.all(16),
+            itemCount: docs.length,
+            itemBuilder: (context, index) {
+              final doc = docs[index];
+              final data = doc.data();
+
+              final title = (data['title'] ?? 'Event').toString();
+              final location = (data['location'] ?? '').toString();
+              final date = data['date'] as Timestamp?;
+              final imageUrl = (data['imageUrl'] ?? '').toString();
+
+              final dt = date?.toDate();
+              final dateLabel = dt == null
+                  ? ''
+                  : '${dt.month}/${dt.day}/${dt.year} – ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+
+              return Card(
+                margin: const EdgeInsets.only(bottom: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: ListTile(
+                  leading: imageUrl.isNotEmpty
+                      ? ClipRRect(
+                          borderRadius: BorderRadius.circular(10),
+                          child: Image.network(
+                            imageUrl,
+                            width: 56,
+                            height: 56,
+                            fit: BoxFit.cover,
+                          ),
+                        )
+                      : const Icon(Icons.event, color: accent),
+                  title: Text(
+                    title,
+                    style: const TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                  subtitle: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (location.isNotEmpty) Text(location),
+                      if (dateLabel.isNotEmpty)
+                        Text(
+                          dateLabel,
+                          style: const TextStyle(fontSize: 12),
+                        ),
+                    ],
+                  ),
+                  trailing: IconButton(
+                    icon: const Icon(Icons.delete_outline),
+                    onPressed: () async {
+                      await doc.reference.delete();
+                    },
+                  ),
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => AdminEventForm(
+                          eventId: doc.id,
+                          initialData: data,
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              );
+            },
+          );
+        },
       ),
-
       floatingActionButton: FloatingActionButton(
-        backgroundColor: const Color(0xFF7B2CBF),
-        elevation: 4,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(50),
-        ),
+        backgroundColor: accent,
         onPressed: () {
           Navigator.push(
             context,
-            MaterialPageRoute(builder: (_) => const AdminEventForm()),
+            MaterialPageRoute(
+              builder: (_) => const AdminEventForm(),
+            ),
           );
         },
-        child: const Icon(
-          Icons.event_available_rounded, // Event icon
-          size: 30,
-          color: Colors.white,
-        ),
-      ),
-    );
-  }
-}
-
-//
-// ---------------------------------------------------------
-// EVENT CARD WIDGET
-// ---------------------------------------------------------
-//
-class EventCard extends StatelessWidget {
-  final String title;
-  final String date;
-  final String location;
-  final String imagePath;
-
-  const EventCard({
-    super.key,
-    required this.title,
-    required this.date,
-    required this.location,
-    required this.imagePath,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: const Color(0xFFF9F6FF),
-        borderRadius: BorderRadius.circular(18),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 8,
-            offset: const Offset(0, 3),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Event Image
-          ClipRRect(
-            borderRadius: const BorderRadius.only(
-              topLeft: Radius.circular(18),
-              topRight: Radius.circular(18),
-            ),
-            child: Image.asset(
-              imagePath,
-              height: 150,
-              width: double.infinity,
-              fit: BoxFit.cover,
-            ),
-          ),
-
-          // Details
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Title
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 18,
-                    color: Colors.black87,
-                  ),
-                ),
-                const SizedBox(height: 6),
-
-                // Date
-                Row(
-                  children: [
-                    const Icon(Icons.access_time_rounded,
-                        size: 18, color: Colors.grey),
-                    const SizedBox(width: 6),
-                    Text(
-                      date,
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: Colors.grey.shade700,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-
-                // Location
-                Row(
-                  children: [
-                    const Icon(Icons.location_on_rounded,
-                        size: 18, color: Colors.grey),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: Text(
-                        location,
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: Colors.grey.shade700,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ],
+        child: const Icon(Icons.add, color: Colors.white),
       ),
     );
   }

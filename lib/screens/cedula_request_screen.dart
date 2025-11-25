@@ -1,6 +1,8 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'dart:io';
 
+import '../services/notification_service.dart';
 
 class CedulaRequestScreen extends StatefulWidget {
   const CedulaRequestScreen({super.key});
@@ -10,148 +12,209 @@ class CedulaRequestScreen extends StatefulWidget {
 }
 
 class _CedulaRequestScreenState extends State<CedulaRequestScreen> {
-  final TextEditingController fullNameController = TextEditingController();
-  final TextEditingController addressController = TextEditingController();
-  final TextEditingController phoneController = TextEditingController();
-  final TextEditingController emailController = TextEditingController();
-  final TextEditingController birthdayController = TextEditingController();
+  final _formKey = GlobalKey<FormState>();
 
+  final _fullnameController = TextEditingController();
+  final _addressController = TextEditingController();
+  final _cellController = TextEditingController();
+  final _emailController = TextEditingController();
+  final _birthdayController = TextEditingController();
+  final _idController = TextEditingController();
 
+  bool _isSubmitting = false;
 
+  @override
+  void initState() {
+    super.initState();
+    _prefillFromUser();
+  }
 
+  @override
+  void dispose() {
+    _fullnameController.dispose();
+    _addressController.dispose();
+    _cellController.dispose();
+    _emailController.dispose();
+    _birthdayController.dispose();
+    _idController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _prefillFromUser() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .get();
+
+      final data = doc.data();
+      if (data != null && mounted) {
+        _fullnameController.text = (data['fullname'] ?? '').toString();
+        _addressController.text = (data['address'] ?? '').toString();
+        _cellController.text = (data['cellphone'] ?? '').toString();
+        _emailController.text = (data['email'] ?? '').toString();
+        _birthdayController.text = (data['birthday'] ?? '').toString();
+        setState(() {});
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _submit() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    setState(() => _isSubmitting = true);
+
+    try {
+      final docRef =
+          await FirebaseFirestore.instance.collection('requests').add({
+        'userId': user.uid,
+        'documentType': 'Cedula',
+        'fullname': _fullnameController.text.trim(),
+        'address': _addressController.text.trim(),
+        'cellphone': _cellController.text.trim(),
+        'email': _emailController.text.trim(),
+        'birthday': _birthdayController.text.trim(),
+        'idNumber': _idController.text.trim(),
+        'status': 'pending',
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+
+      // 🔔 Notify user
+      await NotificationService.createNotification(
+        userId: user.uid,
+        title: 'Cedula request received',
+        body:
+            'Your Cedula request has been submitted and is now pending review.',
+        type: 'request',
+        relatedId: docRef.id,
+      );
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Cedula request submitted')),
+      );
+      Navigator.pop(context);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to submit request: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _isSubmitting = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    const Color accent = Color(0xFF7B2CBF);
+    const accent = Color(0xFF7B2CF7);
+    const fieldBg = Color(0xFFF5F5F5);
 
     return Scaffold(
       backgroundColor: Colors.white,
+      appBar: AppBar(
+        title: const Text(
+          'Request Cedula',
+          style: TextStyle(color: Colors.black87),
+        ),
+        backgroundColor: Colors.white,
+        foregroundColor: Colors.black87,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded),
+          onPressed: () => Navigator.pop(context),
+        ),
+      ),
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Top decorative purple curve
-              
-
-              const SizedBox(height: 10),
-
-              // Title
-              const Text(
-                "Request",
-                style: TextStyle(
-                  fontSize: 32,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.black,
-                ),
-              ),
-              const Text(
-                "Cedula",
-                style: TextStyle(
-                  fontSize: 32,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.black,
-                ),
-              ),
-
-              const SizedBox(height: 40),
-
-              // Form Fields
-              _buildTextField("Full Name", fullNameController),
-              const SizedBox(height: 16),
-              _buildTextField("Address", addressController),
-              const SizedBox(height: 16),
-              _buildTextField("Cellphone No.", phoneController),
-              const SizedBox(height: 16),
-              _buildTextField("Email", emailController),
-              const SizedBox(height: 16),
-              _buildTextField("Birthday", birthdayController),
-              const SizedBox(height: 16),
-
-              // Verified ID field
-              GestureDetector(
-
-                child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF5F2F9),
-                    borderRadius: BorderRadius.circular(30),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      
-                      const Icon(Icons.upload_rounded,
-                          color: Colors.black45, size: 20),
-                    ],
-                  ),
-                ),
-              ),
-
-              const SizedBox(height: 40),
-
-              // Submit Button
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: accent,
-                    padding: const EdgeInsets.symmetric(vertical: 18),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(30),
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+          child: Form(
+            key: _formKey,
+            child: Column(
+              children: [
+                _buildField('FullName', _fullnameController, fieldBg),
+                _buildField('Address', _addressController, fieldBg),
+                _buildField('Cellphone No.', _cellController, fieldBg,
+                    keyboardType: TextInputType.phone),
+                _buildField('Email', _emailController, fieldBg,
+                    keyboardType: TextInputType.emailAddress),
+                _buildField('Birthday', _birthdayController, fieldBg),
+                _buildField('Verified ID', _idController, fieldBg),
+                const SizedBox(height: 24),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: accent,
+                      padding: const EdgeInsets.symmetric(vertical: 18),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(18),
+                      ),
                     ),
+                    onPressed: _isSubmitting ? null : _submit,
+                    child: _isSubmitting
+                        ? const SizedBox(
+                            height: 20,
+                            width: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor:
+                                  AlwaysStoppedAnimation<Color>(Colors.white),
+                            ),
+                          )
+                        : const Text(
+                            'Submit',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
                   ),
-                  onPressed: () {
-                    // TODO: Handle submit logic later
-                  },
+                ),
+                const SizedBox(height: 12),
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
                   child: const Text(
-                    "Submit",
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w600,
-                      fontSize: 16,
-                    ),
+                    'Cancel',
+                    style: TextStyle(color: Colors.black54, fontSize: 14),
                   ),
                 ),
-              ),
-
-              const SizedBox(height: 10),
-
-              // Cancel
-              Center(
-                child: GestureDetector(
-                  onTap: () => Navigator.pop(context),
-                  child: const Text(
-                    "Cancel",
-                    style: TextStyle(
-                      color: Colors.black54,
-                      fontSize: 15,
-                    ),
-                  ),
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
     );
   }
 
-  Widget _buildTextField(String hint, TextEditingController controller) {
-    return TextField(
-      controller: controller,
-      decoration: InputDecoration(
-        hintText: hint,
-        hintStyle: const TextStyle(color: Colors.grey, fontSize: 15),
-        filled: true,
-        fillColor: const Color(0xFFF5F2F9),
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(30),
-          borderSide: BorderSide.none,
+  Widget _buildField(
+    String hint,
+    TextEditingController controller,
+    Color bg, {
+    TextInputType keyboardType = TextInputType.text,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 14),
+      child: TextFormField(
+        controller: controller,
+        keyboardType: keyboardType,
+        validator: (value) =>
+            (value ?? '').trim().isEmpty ? '$hint is required' : null,
+        decoration: InputDecoration(
+          filled: true,
+          fillColor: bg,
+          hintText: hint,
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(30),
+            borderSide: BorderSide.none,
+          ),
         ),
       ),
     );
