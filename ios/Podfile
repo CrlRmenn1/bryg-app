@@ -1,6 +1,6 @@
 # CocoaPods Podfile for Flutter iOS
 
-platform :ios, '13.0'
+platform :ios, '15.0'
 ENV['COCOAPODS_DISABLE_STATS'] = 'true'
 
 project 'Runner', {
@@ -47,7 +47,7 @@ post_install do |installer|
 
     # Make sure every pod uses at least iOS 13
     target.build_configurations.each do |config|
-      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '13.0'
+      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.0'
     end
 
     flutter_additional_ios_build_settings(target)
